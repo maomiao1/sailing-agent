@@ -1,24 +1,40 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
-interface CreateProjectDialogProps {
+interface EditProjectDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, responsiblePerson: string, month: string) => void;
+  onUpdate: (id: string, name: string, responsiblePerson: string, month: string) => void;
+  project: {
+    id: string;
+    name: string;
+    responsible_person: string;
+    month: string;
+  } | null;
 }
 
-export default function CreateProjectDialog({
+export default function EditProjectDialog({
   isOpen,
   onClose,
-  onCreate,
-}: CreateProjectDialogProps) {
+  onUpdate,
+  project,
+}: EditProjectDialogProps) {
   const [name, setName] = useState('');
   const [responsiblePerson, setResponsiblePerson] = useState('');
   const [month, setMonth] = useState('');
 
-  if (!isOpen) return null;
+  // Update form when project changes
+  useEffect(() => {
+    if (project && isOpen) {
+      setName(project.name);
+      setResponsiblePerson(project.responsible_person || '');
+      setMonth(project.month);
+    }
+  }, [project, isOpen]);
+
+  if (!isOpen || !project) return null;
 
   // 生成当前年份的前后3年的月份选项
   const generateMonthOptions = () => {
@@ -36,20 +52,11 @@ export default function CreateProjectDialog({
 
   const monthOptions = generateMonthOptions();
 
-  // 设置默认月份为当前月份
-  if (!month && isOpen) {
-    const now = new Date();
-    const defaultMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-    setMonth(defaultMonth);
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && month) {
-      onCreate(name.trim(), responsiblePerson.trim(), month);
-      setName('');
-      setResponsiblePerson('');
-      setMonth('');
+      onUpdate(project.id, name.trim(), responsiblePerson.trim(), month);
+      handleClose();
     }
   };
 
@@ -65,7 +72,7 @@ export default function CreateProjectDialog({
       <div className="bg-card rounded-xl shadow-xl max-w-md w-full">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-semibold text-foreground">创建新项目</h2>
+          <h2 className="text-xl font-semibold text-foreground">编辑项目</h2>
           <button
             onClick={handleClose}
             className="text-text-secondary hover:text-foreground transition-colors"
@@ -138,7 +145,7 @@ export default function CreateProjectDialog({
               type="submit"
               className="flex-1 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-medium transition-colors"
             >
-              创建项目
+              保存修改
             </button>
           </div>
         </form>

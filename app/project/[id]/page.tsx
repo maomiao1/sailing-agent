@@ -134,9 +134,11 @@ export default function ProjectDetailPage() {
         })
       });
 
-      if (!response.ok) throw new Error('生成失败');
-
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '生成失败');
+      }
 
       // Update project status
       await supabase
@@ -144,11 +146,35 @@ export default function ProjectDetailPage() {
         .update({ status: 'completed' })
         .eq('id', projectId);
 
-      alert('内容生成成功！');
+      // Show detailed results
+      const { successCount, failedCount, results } = data;
+
+      if (failedCount > 0) {
+        // Build detailed error message
+        const failedComponents = results
+          .filter((r: any) => r.status === 'rejected')
+          .map((r: any, index: number) => {
+            const componentName = COMPONENT_NAMES[Object.values(COMPONENT_TYPES)[index] as keyof typeof COMPONENT_NAMES];
+            const reason = r.reason?.message || r.reason || '未知错误';
+            return `- ${componentName}: ${reason}`;
+          })
+          .join('\n');
+
+        alert(
+          `生成完成，但有部分失败:\n\n` +
+          `✅ 成功: ${successCount} 个\n` +
+          `❌ 失败: ${failedCount} 个\n\n` +
+          `失败详情:\n${failedComponents}\n\n` +
+          `请检查失败的组件并尝试单独重新生成。`
+        );
+      } else {
+        alert(`✅ 全部内容生成成功！\n共生成 ${successCount} 个组件`);
+      }
+
       loadProjectData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('生成失败:', error);
-      alert('生成失败，请重试');
+      alert(`生成失败: ${error.message || '请重试'}`);
     } finally {
       setGenerating(false);
     }

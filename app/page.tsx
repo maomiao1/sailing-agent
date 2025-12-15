@@ -4,17 +4,47 @@ import { useState, useEffect } from 'react';
 import { supabase, type Project } from '@/lib/supabase';
 import ProjectCard from '@/components/ProjectCard';
 import CreateProjectDialog from '@/components/CreateProjectDialog';
+import EditProjectDialog from '@/components/EditProjectDialog';
+import MonthSelector from '@/components/MonthSelector';
 import { Plus } from 'lucide-react';
 
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [currentMonth, setCurrentMonth] = useState('2026年3月');
+  const [currentMonth, setCurrentMonth] = useState('');
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadProjects();
+    loadAvailableMonths();
+  }, []);
+
+  useEffect(() => {
+    if (currentMonth) {
+      loadProjects();
+    }
   }, [currentMonth]);
+
+  async function loadAvailableMonths() {
+    // 获取所有已存在的月份
+    const { data, error } = await supabase
+      .from('projects')
+      .select('month')
+      .order('month', { ascending: false });
+
+    if (error) {
+      console.error('加载月份失败:', error);
+    } else {
+      const months = Array.from(new Set(data?.map(p => p.month) || []));
+      setAvailableMonths(months);
+      // 设置当前月份为最新的月份
+      if (months.length > 0 && !currentMonth) {
+        setCurrentMonth(months[0]);
+      }
+    }
+  }
 
   async function loadProjects() {
     setLoading(true);
@@ -33,11 +63,11 @@ export default function Home() {
     setLoading(false);
   }
 
-  async function handleCreateProject(name: string, responsiblePerson: string) {
-    const { data, error } = await supabase
+  async function handleCreateProject(name: string, responsiblePerson: string, month: string) {
+    const { data, error} = await supabase
       .from('projects')
       .insert({
-        month: currentMonth,
+        month,
         name,
         responsible_person: responsiblePerson,
         status: 'draft'
@@ -49,8 +79,43 @@ export default function Home() {
       console.error('创建项目失败:', error);
       alert('创建项目失败，请重试');
     } else {
-      setProjects([data, ...projects]);
       setIsDialogOpen(false);
+      // 刷新月份列表
+      await loadAvailableMonths();
+      // 切换到新创建项目的月份
+      setCurrentMonth(month);
+    }
+  }
+
+  function handleEditClick(project: Project) {
+    setEditingProject(project);
+    setIsEditDialogOpen(true);
+  }
+
+  async function handleUpdateProject(id: string, name: string, responsiblePerson: string, month: string) {
+    const { error } = await supabase
+      .from('projects')
+      .update({
+        name,
+        responsible_person: responsiblePerson,
+        month
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('更新项目失败:', error);
+      alert('更新项目失败，请重试');
+    } else {
+      setIsEditDialogOpen(false);
+      setEditingProject(null);
+      // 刷新月份列表
+      await loadAvailableMonths();
+      // 如果月份改变了，切换到新月份，否则刷新当前列表
+      if (month !== currentMonth) {
+        setCurrentMonth(month);
+      } else {
+        loadProjects();
+      }
     }
   }
 
@@ -74,17 +139,17 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-10">
-        {/* Month Title and Add Button */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-3xl font-bold text-foreground mb-2">
-              {currentMonth}航海项目
-            </h2>
-            <div className="h-1 w-20 bg-primary rounded-full"></div>
-          </div>
+        {/* Month Selector and Add Button */}
+        <div className="flex items-center justify-between mb-8 gap-4">
+          <MonthSelector
+            availableMonths={availableMonths}
+            currentMonth={currentMonth}
+            onMonthChange={setCurrentMonth}
+            onMonthsUpdate={loadAvailableMonths}
+          />
           <button
             onClick={() => setIsDialogOpen(true)}
-            className="inline-flex items-center gap-2 px-6 py-3 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg border-2 border-primary/30"
+            className="inline-flex items-center gap-2 px-6 py-3 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg border-2 border-primary/30 whitespace-nowrap"
             style={{
               background: 'linear-gradient(135deg, #409E88 0%, #368573 100%)',
               boxShadow: '0 4px 12px rgba(64, 158, 136, 0.3)'
@@ -115,6 +180,7 @@ export default function Home() {
                 key={project.id}
                 project={project}
                 onUpdate={loadProjects}
+                onEdit={handleEditClick}
               />
             ))}
           </div>
@@ -126,6 +192,17 @@ export default function Home() {
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         onCreate={handleCreateProject}
+      />
+
+      {/* Edit Project Dialog */}
+      <EditProjectDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => {
+          setIsEditDialogOpen(false);
+          setEditingProject(null);
+        }}
+        onUpdate={handleUpdateProject}
+        project={editingProject}
       />
     </div>
   );

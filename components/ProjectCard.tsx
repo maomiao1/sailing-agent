@@ -9,9 +9,10 @@ import { useState } from 'react';
 interface ProjectCardProps {
   project: Project;
   onUpdate: () => void;
+  onEdit: (project: Project) => void;
 }
 
-export default function ProjectCard({ project, onUpdate }: ProjectCardProps) {
+export default function ProjectCard({ project, onUpdate, onEdit }: ProjectCardProps) {
   const [deleting, setDeleting] = useState(false);
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
@@ -90,6 +91,13 @@ export default function ProjectCard({ project, onUpdate }: ProjectCardProps) {
             <Eye size={16} />
             查看详情
           </Link>
+          <button
+            onClick={() => onEdit(project)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-primary/30 text-primary hover:bg-primary hover:text-white rounded-lg text-sm font-medium transition-all bg-primary/5"
+            title="编辑项目"
+          >
+            <Edit size={16} />
+          </button>
           <button
             onClick={handleDelete}
             disabled={deleting}
