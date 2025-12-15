@@ -3,16 +3,13 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
+import { type Project } from '@/lib/supabase';
+
 interface EditProjectDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (id: string, name: string, responsiblePerson: string, month: string) => void;
-  project: {
-    id: string;
-    name: string;
-    responsible_person: string;
-    month: string;
-  } | null;
+  project: Project | null;
 }
 
 export default function EditProjectDialog({
