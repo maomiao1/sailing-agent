@@ -154,8 +154,23 @@ export default function ProjectDetailPage() {
         const failedComponents = results
           .filter((r: any) => r.status === 'rejected')
           .map((r: any, index: number) => {
-            const componentName = COMPONENT_NAMES[Object.values(COMPONENT_TYPES)[index] as keyof typeof COMPONENT_NAMES];
-            const reason = r.reason?.message || r.reason || '未知错误';
+            const componentType = Object.values(COMPONENT_TYPES)[index];
+            const componentName = COMPONENT_NAMES[componentType as keyof typeof COMPONENT_NAMES];
+
+            // 提取错误原因
+            let reason = '未知错误';
+            if (r.reason) {
+              if (typeof r.reason === 'string') {
+                reason = r.reason;
+              } else if (r.reason.message) {
+                reason = r.reason.message;
+              } else if (r.reason.toString) {
+                reason = r.reason.toString();
+              } else {
+                reason = JSON.stringify(r.reason);
+              }
+            }
+
             return `- ${componentName}: ${reason}`;
           })
           .join('\n');
