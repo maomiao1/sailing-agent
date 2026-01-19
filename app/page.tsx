@@ -36,12 +36,21 @@ export default function Home() {
 
     if (error) {
       console.error('加载月份失败:', error);
+      setProjects([]);
+      setLoading(false);
+      return;
     } else {
       const months = Array.from(new Set(data?.map(p => p.month) || []));
       setAvailableMonths(months);
       // 设置当前月份为最新的月份
-      if (months.length > 0 && !currentMonth) {
-        setCurrentMonth(months[0]);
+      if (months.length > 0) {
+        if (!months.includes(currentMonth)) {
+          setCurrentMonth(months[0]);
+        }
+      } else {
+        setCurrentMonth('');
+        setProjects([]);
+        setLoading(false);
       }
     }
   }

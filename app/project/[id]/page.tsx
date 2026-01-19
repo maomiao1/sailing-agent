@@ -162,12 +162,16 @@ export default function ProjectDetailPage() {
             if (r.reason) {
               if (typeof r.reason === 'string') {
                 reason = r.reason;
+              } else if (r.reason instanceof Error) {
+                reason = r.reason.message || r.reason.toString();
               } else if (r.reason.message) {
                 reason = r.reason.message;
-              } else if (r.reason.toString) {
-                reason = r.reason.toString();
               } else {
-                reason = JSON.stringify(r.reason);
+                try {
+                  reason = JSON.stringify(r.reason);
+                } catch {
+                  reason = String(r.reason);
+                }
               }
             }
 
