@@ -33,54 +33,85 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate all components
-    const results = await Promise.allSettled(
-      Object.values(COMPONENT_TYPES).map(async (componentType) => {
-        const template = templates.find((t) => t.component_type === componentType);
-        if (!template) {
-          throw new Error(`找不到 ${componentType} 的模板`);
-        }
+    async function generateAndSave(componentType: string, detailPageContent?: string) {
+      const template = templates.find((t) => t.component_type === componentType);
+      if (!template) {
+        throw new Error(`找不到 ${componentType} 的模板`);
+      }
 
-        // Generate content using Gemini API
-        const content = await generateComponent(
-          componentType,
-          manualContent,
-          template
-        );
+      const content = await generateComponent(
+        componentType,
+        manualContent,
+        template,
+        componentType === COMPONENT_TYPES.FIRST_LESSON ? detailPageContent : undefined
+      );
 
-        // Check if component already exists
-        const { data: existing } = await supabase
+      const { data: existing } = await supabase
+        .from('components')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('component_type', componentType)
+        .single();
+
+      if (existing) {
+        await supabase
           .from('components')
-          .select('id')
-          .eq('project_id', projectId)
-          .eq('component_type', componentType)
-          .single();
+          .update({
+            content,
+            generated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('components')
+          .insert({
+            project_id: projectId,
+            component_type: componentType,
+            content,
+            generated_at: new Date().toISOString()
+          });
+      }
 
-        if (existing) {
-          // Update existing
-          await supabase
-            .from('components')
-            .update({
-              content,
-              generated_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existing.id);
-        } else {
-          // Insert new
-          await supabase
-            .from('components')
-            .insert({
-              project_id: projectId,
-              component_type: componentType,
-              content,
-              generated_at: new Date().toISOString()
-            });
-        }
+      return { type: componentType, status: 'success' };
+    }
 
-        return { type: componentType, status: 'success' };
-      })
+    const detailPageType = COMPONENT_TYPES.DETAIL_PAGE;
+    let detailPageContent: string | undefined;
+    let detailResult: PromiseSettledResult<{ type: string; status: 'success' }>;
+
+    try {
+      const detailTemplate = templates.find((t) => t.component_type === detailPageType);
+      if (!detailTemplate) {
+        throw new Error(`找不到 ${detailPageType} 的模板`);
+      }
+
+      detailPageContent = await generateComponent(
+        detailPageType,
+        manualContent,
+        detailTemplate
+      );
+
+      await generateAndSave(detailPageType, detailPageContent);
+      detailResult = {
+        status: 'fulfilled',
+        value: { type: detailPageType, status: 'success' }
+      };
+    } catch (error) {
+      detailResult = { status: 'rejected', reason: error };
+    }
+
+    const remainingTypes = Object.values(COMPONENT_TYPES).filter(
+      (componentType) => componentType !== detailPageType
     );
+
+    const remainingResults = await Promise.allSettled(
+      remainingTypes.map((componentType) =>
+        generateAndSave(componentType, detailPageContent)
+      )
+    );
+
+    const results = [detailResult, ...remainingResults];
 
     // Update project status to completed
     await supabase
